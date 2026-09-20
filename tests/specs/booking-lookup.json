@@ -1,0 +1,20 @@
+[
+  {
+    "name": "My booking",
+    "steps": [
+      {
+        "expect": [
+          {
+            "method": "sendMessage",
+            "payload": {
+              "text": "Lookup or manage an existing booking by reference or phone"
+            }
+          }
+        ],
+        "send": {
+          "callback": "booking:lookup"
+        }
+      }
+    ]
+  }
+]
