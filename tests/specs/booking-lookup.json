@@ -7,7 +7,7 @@
           {
             "method": "sendMessage",
             "payload": {
-              "text": "Lookup or manage an existing booking by reference or phone"
+              "text": "Send your reference code or phone number and I’ll find it."
             }
           }
         ],

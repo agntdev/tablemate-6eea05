@@ -7,4 +7,6 @@ export * from "./session/memory.js";
 export * from "./session/redis.js";
 export * from "./telemetry/reporter.js";
 export * from "./owner.js";
+export * from "./data.js";
+export { remindAt } from "./session/durable.js";
 export * from "./harness/index.js";

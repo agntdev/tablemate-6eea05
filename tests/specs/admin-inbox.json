@@ -7,7 +7,7 @@
           {
             "method": "sendMessage",
             "payload": {
-              "text": "Open owner admin view with upcoming bookings and daily capacity (owner only)"
+              "text": "Owner access isn't set up yet."
             }
           }
         ],
