@@ -5,9 +5,9 @@
       {
         "expect": [
           {
-            "method": "sendMessage",
+            "method": "editMessageText",
             "payload": {
-              "text": "Begin the guided reservation flow (date → time → party size → contact → confirm)"
+              "text": "When would you like to visit?"
             }
           }
         ],
@@ -15,6 +15,17 @@
           "callback": "booking:start"
         }
       }
+    ]
+  },
+  {
+    "name": "Guest reaches reservation confirmation",
+    "steps": [
+      { "send": { "callback": "booking:start" }, "expect": [{ "method": "editMessageText", "payload": { "text": "When would you like to visit?" } }] },
+      { "send": { "callback": "booking:date:2026-09-21" }, "expect": [{ "method": "editMessageText", "payload": { "text": "Here are the open times for 2026-09-21:" } }] },
+      { "send": { "callback": "booking:time:11:00" }, "expect": [{ "method": "editMessageText", "payload": { "text": "How many guests should I book for?" } }] },
+      { "send": { "callback": "booking:party:2" }, "expect": [{ "method": "sendMessage", "payload": { "text": "Send a phone number, or type skip if you’d rather not share one." } }] },
+      { "send": { "text": "skip" }, "expect": [{ "method": "sendMessage", "payload": { "text": "What name should I put on the reservation? Type skip if you’d rather not say." } }] },
+      { "send": { "text": "skip" }, "expect": [{ "method": "sendMessage" }] }
     ]
   }
 ]

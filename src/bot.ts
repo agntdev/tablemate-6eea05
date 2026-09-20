@@ -6,7 +6,18 @@ import type { StorageAdapter } from "grammy";
 // bot grows. Durable domain data must NOT live here — use the toolkit's
 // persistent storage (see AGENTS.md).
 export interface Session {
-  // example: step?: "awaiting_amount";
+  step?: string;
+  booking?: {
+    date?: string;
+    time?: string;
+    partySize?: number;
+    phone?: string;
+    name?: string;
+    reference?: string;
+    bookingId?: string;
+    lookup?: string;
+    rescheduling?: boolean;
+  };
 }
 
 export type Ctx = BotContext<Session>;

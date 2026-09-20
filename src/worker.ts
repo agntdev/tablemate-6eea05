@@ -81,4 +81,24 @@ export default {
 
     return new Response("not found", { status: 404 });
   },
+
+  async scheduled(_event: unknown, env: WorkerEnv): Promise<void> {
+    if (!env.ADMIN_CHAT_ID || !env.DB) return;
+    const db = env.DB as { prepare(sql: string): { bind(...args: unknown[]): { first<T>(): Promise<T | null>; run(): Promise<unknown> } } };
+    await db.prepare("CREATE TABLE IF NOT EXISTS bot_data (key TEXT PRIMARY KEY, value TEXT NOT NULL)").bind().run();
+    const index = await db.prepare("SELECT value FROM bot_data WHERE key = ?1").bind("bookings:index").first<{ value: string }>();
+    const ids: string[] = index ? JSON.parse(index.value) : [];
+    const today = new Date().toISOString().slice(0, 10);
+    let count = 0; let guests = 0;
+    for (const id of ids) {
+      const row = await db.prepare("SELECT value FROM bot_data WHERE key = ?1").bind(`booking:${id}`).first<{ value: string }>();
+      if (!row) continue;
+      const b = JSON.parse(row.value) as { date: string; partySize: number; status: string };
+      if (b.date === today && (b.status === "confirmed" || b.status === "rescheduled")) { count++; guests += b.partySize; }
+    }
+    const failures = await db.prepare("SELECT value FROM bot_data WHERE key = ?1").bind("reminder-failures:index").first<{ value: string }>();
+    const failed = failures ? (JSON.parse(failures.value) as string[]).length : 0;
+    const text = `Today’s capacity overview\n${count} ${count === 1 ? "booking" : "bookings"} · ${guests} guests${failed ? `\n${failed} reminder ${failed === 1 ? "delivery needs" : "deliveries need"} attention.` : ""}`;
+    await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/sendMessage`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ chat_id: env.ADMIN_CHAT_ID, text }) });
+  },
 };

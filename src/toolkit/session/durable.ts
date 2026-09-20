@@ -37,6 +37,7 @@ export interface DOStub {
 }
 export interface WorkerEnv {
   BOT_TOKEN: string;
+  ADMIN_CHAT_ID?: string | number;
   WEBHOOK_SECRET?: string;
   CHAT_DO: DONamespace;
   DB?: unknown; // D1 binding (app data); see AGENTS.md
@@ -49,6 +50,7 @@ interface Reminder {
   at: number; // epoch ms
   chatId: number | string;
   text: string;
+  reply_markup?: unknown;
 }
 
 /**
@@ -93,12 +95,13 @@ export async function remindAt(
   chatId: number | string,
   whenEpochMs: number,
   text: string,
+  replyMarkup?: unknown,
 ): Promise<void> {
   try {
     const stub = env.CHAT_DO.get(env.CHAT_DO.idFromName("chat:" + chatId));
     await stub.fetch("https://do/remind", {
       method: "POST",
-      body: JSON.stringify({ at: whenEpochMs, chatId, text } satisfies Reminder),
+      body: JSON.stringify({ at: whenEpochMs, chatId, text, reply_markup: replyMarkup } satisfies Reminder),
     });
   } catch {
     /* best-effort: a reminder we couldn't schedule must not break the reply */
@@ -106,11 +109,12 @@ export async function remindAt(
 }
 
 async function tg(token: string, method: string, payload: unknown): Promise<void> {
-  await fetch(`https://api.telegram.org/bot${token}/${method}`, {
+  const response = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(payload),
   });
+  if (!response.ok) throw new Error(`Telegram ${method} failed`);
 }
 
 /**
@@ -165,10 +169,26 @@ export class ChatDO {
     const due = list.filter((r) => r.at <= now);
     const rest = list.filter((r) => r.at > now);
     for (const r of due) {
-      await tg(this.env.BOT_TOKEN, "sendMessage", { chat_id: r.chatId, text: r.text });
+      try {
+        await tg(this.env.BOT_TOKEN, "sendMessage", { chat_id: r.chatId, text: r.text, reply_markup: r.reply_markup });
+      } catch {
+        await this.recordReminderFailure(r);
+      }
     }
     await this.state.storage.put("reminders", rest);
     await this.rearm(rest);
+  }
+
+  private async recordReminderFailure(reminder: Reminder): Promise<void> {
+    const db = this.env.DB as { prepare(sql: string): { bind(...args: unknown[]): { first<T>(): Promise<T | null>; run(): Promise<unknown> } } } | undefined;
+    if (!db) return;
+    const id = `reminder-failure:${reminder.chatId}:${reminder.at}`;
+    await db.prepare("CREATE TABLE IF NOT EXISTS bot_data (key TEXT PRIMARY KEY, value TEXT NOT NULL)").bind().run();
+    const indexRow = await db.prepare("SELECT value FROM bot_data WHERE key = ?1").bind("reminder-failures:index").first<{ value: string }>();
+    const ids: string[] = indexRow ? JSON.parse(indexRow.value) : [];
+    if (!ids.includes(id)) ids.push(id);
+    await db.prepare("INSERT INTO bot_data(key,value) VALUES(?1,?2) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(id, JSON.stringify({ at: reminder.at, chatId: reminder.chatId })).run();
+    await db.prepare("INSERT INTO bot_data(key,value) VALUES(?1,?2) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind("reminder-failures:index", JSON.stringify(ids)).run();
   }
 
   private async rearm(list: Reminder[]): Promise<void> {
